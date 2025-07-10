@@ -1,4 +1,5 @@
-import streamlit as st
+import tkinter as tk
+from tkinter import messagebox
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -7,26 +8,22 @@ from selenium.webdriver.support import expected_conditions as EC
 import pickle
 import time
 
-dictionary = {
-    "A": 0,
-    "B": 1,
-    "C": 2,
-    "D": 3,
-    "E": 4,
-    "F": 5,
-    "G": 6,
-    "H": 7,
-    "I": 8,
-    "J": 9,
-}
+ANSWER_MAP = {chr(ord("A") + i): i for i in range(10)}
 
 
-def run_selenium(email_input, password_input):
+def run_automation(email_input, password_input, status_label):
     try:
+        status_label.config(text="Starting Chrome...")
+        root.update()
+
         options = Options()
-        # options.add_argument("--headless=new")  # Optional: run without opening browser window
+        # options.add_argument("--headless")  # Optional for GUI-less operation
+
         driver = webdriver.Chrome(options=options)
         wait = WebDriverWait(driver, 30)
+
+        status_label.config(text="Logging in to AMBOSS...")
+        root.update()
 
         driver.get("https://next.amboss.com/us/login")
         driver.maximize_window()
@@ -39,7 +36,6 @@ def run_selenium(email_input, password_input):
         password.send_keys(password_input)
         login_btn.click()
 
-        # Wait for assignments section
         wait.until(
             lambda d: len(d.find_elements(By.CLASS_NAME, "_4cc9ddf83d96bbf8--header"))
             == 8
@@ -49,33 +45,33 @@ def run_selenium(email_input, password_input):
         ]
         assignments.click()
 
-        # Wait and click resume
         resume_btn = wait.until(
             EC.element_to_be_clickable((By.CLASS_NAME, "css-1vafa9z-StyledButton"))
         )
         resume_btn.click()
 
-        # Load answers
         with open("answers.pkl", "rb") as file:
             answers = pickle.load(file)
 
-        # Get question range from URL
         url = driver.current_url
         start = int(url[48 : url.index("?")])
         end = 1205
 
-        # Wait for tabs
         wait.until(
             lambda d: len(d.find_elements(By.CLASS_NAME, "ed71ad0ad070e9f8--item")) > 0
         )
         tabs = driver.find_elements(By.CLASS_NAME, "ed71ad0ad070e9f8--item")
-
-        # Start answering
         tabs[start - 1].click()
-        question_id = start
 
+        question_id = start
         for tab in tabs[start : end + 1]:
-            answer_index = dictionary[answers[question_id - 1][1]]
+            answer_letter = (
+                answers[question_id - 1][1]
+                if question_id < 1001 or question_id > 1036
+                else "A"
+            )
+            answer_index = ANSWER_MAP.get(answer_letter, 0)
+
             wait.until(
                 lambda d: len(
                     d.find_elements(By.CLASS_NAME, "_981f8b48b6542a07--letterAndText")
@@ -96,35 +92,43 @@ def run_selenium(email_input, password_input):
             tab.click()
             question_id += 1
 
-        st.success("✅ Automation completed successfully!")
-    except Exception as e:
-        st.error(f"❌ An error occurred: {e}")
-    finally:
         driver.quit()
+        status_label.config(text="✅ Automation completed successfully!")
+
+    except Exception as e:
+        status_label.config(text=f"❌ Error: {e}")
 
 
-# === Streamlit UI ===
-st.title("AMBOSS Assignment Automation")
-st.markdown(
-    """
-**What does this app do:**
+# GUI
+root = tk.Tk()
+root.title("AMBOSS Automation")
+root.geometry("400x300")
+root.resizable(False, False)
 
-It auto-answers the questions of **SCFHS R1 Required Learning FM [2024]** in AMBOSS (1205 total questions).  
-All the answers are taken from the `answers.pkl` file which answers are extracted from the PDF file.
+tk.Label(root, text="Email").pack()
+email_entry = tk.Entry(root, width=40)
+email_entry.pack()
 
-**Requirements & Notes:**  
-- You must have **Google Chrome** installed.  
-- **Do NOT minimize the browser** once the automation starts (recommended to run it before you sleep).  
-- Questions **1001-1036** are auto-answered with **'A'** since they are not in the answers file.
-"""
-)
+tk.Label(root, text="Password").pack()
+password_entry = tk.Entry(root, show="*", width=40)
+password_entry.pack()
 
-email_input = st.text_input("Email")
-password_input = st.text_input("Password", type="password")
+status_label = tk.Label(root, text="", fg="green", wraplength=380, justify="left")
+status_label.pack(pady=20)
 
-if st.button("Run Automation"):
-    if email_input and password_input:
-        run_selenium(email_input, password_input)
-    else:
-        st.warning("Please enter both email and password.")
-st.markdown("Made with 💚 by Fares")
+
+def on_click():
+    email = email_entry.get()
+    password = password_entry.get()
+    if not email or not password:
+        messagebox.showwarning(
+            "Input Required", "Please enter both email and password."
+        )
+        return
+    run_automation(email, password, status_label)
+
+
+tk.Button(root, text="Run Automation", command=on_click).pack(pady=10)
+tk.Label(root, text="Made with 💚 by Fares", fg="gray").pack(pady=(10, 5))
+
+root.mainloop()
