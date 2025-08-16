@@ -44,10 +44,11 @@ def run_automation(email_input, password_input, status_label):
             1
         ]
         assignments.click()
-
+        print("reached resume btn")
         resume_btn = wait.until(
-            EC.element_to_be_clickable((By.CLASS_NAME, "css-1vafa9z-StyledButton"))
+            EC.element_to_be_clickable((By.CLASS_NAME, "css-186q8vz-StyledButton"))
         )
+        print(resume_btn)
         resume_btn.click()
 
         with open("answers.pkl", "rb") as file:
